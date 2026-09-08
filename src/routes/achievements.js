@@ -1,34 +1,23 @@
 import { Router } from 'express';
 
+import { getCached, setCached } from '../cache.js';
+
 const router = Router();
 
 const STEAM_BASE = 'https://api.steampowered.com';
 
-// Cache mémoire, même principe que côté Gamelary (games+api.ts/cover+api.ts
-// dans le repo principal) : simple Map avec TTL, suffisant pour une seule
-// instance de démo. Le schéma des succès (noms/descriptions) d'un jeu ne
+// Cache partagé (Redis si REDIS_URL est configurée, sinon Map en mémoire —
+// voir cache.js). Le schéma des succès (noms/descriptions) d'un jeu ne
 // change presque jamais -> TTL long ; l'état débloqué change quand
 // l'utilisateur joue -> TTL court.
 const SCHEMA_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PLAYER_CACHE_TTL_MS = 5 * 60 * 1000;
-const schemaCache = new Map();
-const playerCache = new Map();
-
-function getCached(cache, key) {
-  const entry = cache.get(key);
-  if (entry && entry.expiresAt > Date.now()) return entry.value;
-  return null;
-}
-
-function setCached(cache, key, value, ttlMs) {
-  cache.set(key, { value, expiresAt: Date.now() + ttlMs });
-}
 
 // GetSchemaForGame : liste des succès définis pour un jeu (apiname, nom et
 // description affichés, icônes) — indépendant d'un joueur particulier.
 async function fetchSchema(appid, apiKey) {
-  const cacheKey = appid;
-  const cached = getCached(schemaCache, cacheKey);
+  const cacheKey = `steam:schema:${appid}`;
+  const cached = await getCached(cacheKey);
   if (cached) return cached;
 
   const url = `${STEAM_BASE}/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${appid}&l=french`;
@@ -38,7 +27,7 @@ async function fetchSchema(appid, apiKey) {
   }
   const data = await response.json();
   const achievements = data.game?.availableGameStats?.achievements ?? [];
-  setCached(schemaCache, cacheKey, achievements, SCHEMA_CACHE_TTL_MS);
+  await setCached(cacheKey, achievements, SCHEMA_CACHE_TTL_MS);
   return achievements;
 }
 
@@ -47,8 +36,8 @@ async function fetchSchema(appid, apiKey) {
 // détail du jeu n'est pas public côté joueur — Steam renvoie alors
 // `success: false` avec un message, à distinguer d'une vraie erreur réseau.
 async function fetchPlayerAchievements(appid, steamid, apiKey) {
-  const cacheKey = `${appid}:${steamid}`;
-  const cached = getCached(playerCache, cacheKey);
+  const cacheKey = `steam:player:${appid}:${steamid}`;
+  const cached = await getCached(cacheKey);
   if (cached) return cached;
 
   const url = `${STEAM_BASE}/ISteamUserStats/GetPlayerAchievements/v0001/?key=${apiKey}&steamid=${steamid}&appid=${appid}&l=french`;
@@ -64,7 +53,7 @@ async function fetchPlayerAchievements(appid, steamid, apiKey) {
     throw new Error(data.playerstats.error ?? 'Profil ou détails du jeu non publics sur Steam');
   }
   const achievements = data.playerstats?.achievements ?? [];
-  setCached(playerCache, cacheKey, achievements, PLAYER_CACHE_TTL_MS);
+  await setCached(cacheKey, achievements, PLAYER_CACHE_TTL_MS);
   return achievements;
 }
 

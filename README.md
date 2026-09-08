@@ -68,12 +68,28 @@ Obtenir une clé Steam Web API : https://steamcommunity.com/dev/apikey
 2. **New +** → **Web Service** → connecter ce repo GitHub
    (`Jarodwayo/gamelary-api`).
 3. Build Command : `npm install` — Start Command : `npm start`.
-4. Onglet **Environment** : ajouter `STEAM_API_KEY` avec la vraie clé (et
-   `ALLOWED_ORIGINS` si besoin de restreindre les origines plus tard) —
+4. Onglet **Environment** : ajouter `STEAM_API_KEY` avec la vraie clé,
+   `REDIS_URL` si un cache partagé est disponible (voir plus bas — optionnel),
+   et `ALLOWED_ORIGINS` si besoin de restreindre les origines plus tard —
    **jamais** dans le repo Git, uniquement ici.
 5. Une fois déployé, Render donne une URL du type
    `https://gamelary-api.onrender.com`. C'est cette URL que Gamelary doit
-   appeler (voir la constante `STEAM_API_BASE_URL` côté app).
+   appeler (`EXPO_PUBLIC_STEAM_API_URL`, `.env` à la racine du repo
+   principal — voir `src/lib/steam-api-url.ts` côté app).
+
+## Cache (Redis, optionnel)
+
+Les deux appels Steam (`GetSchemaForGame`, `GetPlayerAchievements`) sont
+mis en cache (`src/cache.js`) pour éviter de rappeler Steam à chaque
+requête (schéma : 7 jours, quasi statique ; succès du joueur : 5 minutes,
+change quand il joue). Sans `REDIS_URL`, ce cache est une simple `Map` en
+mémoire — fonctionne, mais se vide à chaque redémarrage du service et ne
+serait pas partagé si plusieurs instances tournaient. Avec `REDIS_URL`
+configurée (ex. Render Key Value, Upstash...), le cache passe sur Redis
+automatiquement, sans changement de code ailleurs. Une panne de connexion
+Redis ne fait jamais échouer une requête : le code retombe silencieusement
+sur la Map en mémoire dans ce cas (voir les logs du service pour le
+diagnostiquer).
 
 ## Sécurité
 

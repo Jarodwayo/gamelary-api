@@ -111,3 +111,17 @@ test('ne met jamais une erreur Steam en cache : le rappel suivant retente', asyn
   expect(retried.body).toEqual({ games: [{ appid: 620, name: 'Portal 2', playtimeMinutes: 120 }] });
   expect(global.fetch).toHaveBeenCalledTimes(2);
 });
+
+test('encode le steamid avant de le placer dans l’URL Steam', async () => {
+  mockSteamGamesFetch({ response: { games: [] } });
+
+  // Une valeur collée dans le champ "Lier mon compte Steam" n'est validée
+  // nulle part (voir game-store.tsx côté Gamelary) : sans encodage, un `&`
+  // injecterait un paramètre supplémentaire dans la requête envoyée à Steam.
+  await request(app).get('/api/steam/games').query({ steamid: '76561197960435540&format=xml' });
+
+  const calledUrl = global.fetch.mock.calls[0][0];
+  expect(calledUrl).toContain('steamid=76561197960435540%26format%3Dxml');
+  // Le paramètre injecté ne doit jamais apparaître comme un vrai paramètre.
+  expect(calledUrl).not.toContain('&format=xml');
+});

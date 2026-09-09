@@ -17,11 +17,14 @@ const OWNED_GAMES_CACHE_TTL_MS = 5 * 60 * 1000;
 // GetPlayerAchievements (route achievements.js), pas d'appid en entrée :
 // c'est un appel unique pour tout le compte.
 async function fetchOwnedGames(steamid, apiKey) {
+  // Clé de cache sur la valeur BRUTE, encodage seulement dans l'URL : le
+  // cache doit distinguer deux valeurs distinctes, l'encodage ne concerne
+  // que ce qui part sur le réseau.
   const cacheKey = `steam:owned:${steamid}`;
   const cached = await getCached(cacheKey);
   if (cached) return cached;
 
-  const url = `${STEAM_BASE}/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamid}&format=json&include_appinfo=1`;
+  const url = `${STEAM_BASE}/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${encodeURIComponent(steamid)}&format=json&include_appinfo=1`;
   const response = await fetch(url);
   if (!response.ok) {
     // Rien n'est écrit en cache ici : une erreur Steam passagère ne doit pas

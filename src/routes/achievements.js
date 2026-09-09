@@ -20,7 +20,7 @@ async function fetchSchema(appid, apiKey) {
   const cached = await getCached(cacheKey);
   if (cached) return cached;
 
-  const url = `${STEAM_BASE}/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${appid}&l=french`;
+  const url = `${STEAM_BASE}/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${encodeURIComponent(appid)}&l=french`;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Steam GetSchemaForGame a échoué (${response.status})`);
@@ -40,7 +40,7 @@ async function fetchPlayerAchievements(appid, steamid, apiKey) {
   const cached = await getCached(cacheKey);
   if (cached) return cached;
 
-  const url = `${STEAM_BASE}/ISteamUserStats/GetPlayerAchievements/v0001/?key=${apiKey}&steamid=${steamid}&appid=${appid}&l=french`;
+  const url = `${STEAM_BASE}/ISteamUserStats/GetPlayerAchievements/v0001/?key=${apiKey}&steamid=${encodeURIComponent(steamid)}&appid=${encodeURIComponent(appid)}&l=french`;
   const response = await fetch(url);
   if (!response.ok) {
     // Steam renvoie 400 pour un jeu sans succès configurés plutôt qu'une

@@ -9,7 +9,7 @@ const STEAM_BASE = 'https://api.steampowered.com';
 // GetPlayerAchievements (route achievements.js), pas d'appid en entrée :
 // c'est un appel unique pour tout le compte.
 async function fetchOwnedGames(steamid, apiKey) {
-  const url = `${STEAM_BASE}/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamid}&format=json&include_appinfo=1`;
+  const url = `${STEAM_BASE}/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${encodeURIComponent(steamid)}&format=json&include_appinfo=1`;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Steam GetOwnedGames a échoué (${response.status})`);

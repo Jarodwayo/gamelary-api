@@ -51,7 +51,13 @@ const steamRateLimiter = rateLimit({
   message: { error: 'Trop de requêtes, réessaie dans une minute' },
 });
 
-app.use('/api/steam', steamRateLimiter, achievementsRouter);
-app.use('/api/steam', steamRateLimiter, gamesRouter);
+// Monté UNE SEULE FOIS pour le préfixe, pas répété sur chaque routeur :
+// répété, une requête vers /games traversait les deux montages (le premier
+// incrémente le compteur, son routeur ne matche pas, le second incrémente à
+// nouveau) et comptait donc double — 15 requêtes/min réelles sur /games
+// contre 30 sur /achievements, pour une limite pourtant annoncée identique.
+app.use('/api/steam', steamRateLimiter);
+app.use('/api/steam', achievementsRouter);
+app.use('/api/steam', gamesRouter);
 
 export default app;

@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from '@jest/globals';
+import { afterEach, expect, jest, test } from '@jest/globals';
 import request from 'supertest';
 
 // app.js lit ALLOWED_ORIGINS une seule fois, au chargement du module (voir
@@ -48,4 +48,26 @@ test('ALLOWED_ORIGINS renseignée : une origine non listée ne reçoit aucun hea
 
   expect(res.status).toBe(200);
   expect(res.headers['access-control-allow-origin']).toBeUndefined();
+});
+
+test('les routes Steam sont limitées par IP au-delà du quota', async () => {
+  process.env.STEAM_API_KEY = 'test-steam-key';
+  // Instance neuve : le compteur du limiteur vit dans le module, il doit
+  // repartir de zéro pour que ce test ne dépende pas des autres.
+  const app = await freshApp();
+  global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ response: { games: [] } }) }));
+
+  // La limite est de 30 requêtes par minute (voir app.js).
+  for (let i = 0; i < 30; i += 1) {
+    const res = await request(app).get('/api/steam/games').query({ steamid: `7656119796043${i}` });
+    expect(res.status).not.toBe(429);
+  }
+
+  const blocked = await request(app).get('/api/steam/games').query({ steamid: '76561197960439999' });
+  expect(blocked.status).toBe(429);
+
+  // Le ping de santé reste joignable : c'est lui qui réveille le service
+  // endormi sur l'offre gratuite Render.
+  const ping = await request(app).get('/');
+  expect(ping.status).toBe(200);
 });

@@ -2,6 +2,7 @@ import cors from 'cors';
 import express from 'express';
 
 import achievementsRouter from './routes/achievements.js';
+import gamesRouter from './routes/games.js';
 
 // Séparé de server.js pour rester importable par les tests (Supertest) sans
 // jamais ouvrir de vrai port réseau — server.js reste le seul responsable
@@ -27,5 +28,6 @@ app.get('/', (_req, res) => {
 });
 
 app.use('/api/steam', achievementsRouter);
+app.use('/api/steam', gamesRouter);
 
 export default app;

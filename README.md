@@ -2,9 +2,13 @@
 
 Petit backend Node.js/Express qui relaie la [Steam Web API](https://steamcommunity.com/dev)
 pour [Gamelary](https://github.com/Jarodwayo/Gamelary) — bibliothèque de
-jeux vidéo façon Letterboxd. Sert une seule chose : pré-remplir les succès
-d'un jeu (`ISteamUserStats/GetPlayerAchievements` + `GetSchemaForGame`)
-sans jamais exposer la clé API Steam au client mobile.
+jeux vidéo façon Letterboxd. Sert deux choses, sans jamais exposer la clé
+API Steam au client mobile :
+
+- **les succès d'un jeu** (`ISteamUserStats/GetPlayerAchievements` +
+  `GetSchemaForGame`), fusionnés en une seule réponse ;
+- **la bibliothèque Steam du joueur et son temps de jeu**
+  (`IPlayerService/GetOwnedGames`).
 
 ## Pourquoi un backend séparé plutôt qu'une route dans Gamelary
 
@@ -48,6 +52,27 @@ Erreurs renvoyées telles quelles (ex. profil Steam ou détails du jeu non
 publics — Steam l'indique sans erreur HTTP, ce endpoint la transforme en
 `502` avec un message clair) plutôt que masquées.
 
+### `GET /api/steam/games?steamid=`
+
+- `steamid` : SteamID64 du joueur (même champ que ci-dessus).
+
+Bibliothèque Steam complète du joueur avec son temps de jeu total
+(`IPlayerService/GetOwnedGames`), utilisée côté Gamelary pour compléter les
+heures des jeux suivis et créer ceux que le catalogue ne connaît pas encore :
+
+```json
+{
+  "games": [
+    { "appid": 220, "name": "Half-Life 2", "playtimeMinutes": 1234 }
+  ]
+}
+```
+
+Un profil privé ou une bibliothèque masquée n'est **pas** une erreur côté
+Steam : l'API renvoie un `200` avec un objet `response` vide. Ce endpoint le
+traduit en liste vide (`{ "games": [] }`), à distinguer d'une vraie panne
+(`502`).
+
 ## Développement local
 
 ```bash
@@ -79,10 +104,22 @@ Obtenir une clé Steam Web API : https://steamcommunity.com/dev/apikey
 
 ## Cache (Redis, optionnel)
 
-Les deux appels Steam (`GetSchemaForGame`, `GetPlayerAchievements`) sont
-mis en cache (`src/cache.js`) pour éviter de rappeler Steam à chaque
-requête (schéma : 7 jours, quasi statique ; succès du joueur : 5 minutes,
-change quand il joue). Sans `REDIS_URL`, ce cache est une simple `Map` en
+Les trois appels Steam sont mis en cache (`src/cache.js`) pour éviter de
+rappeler Steam à chaque requête, avec un TTL choisi selon la volatilité de
+la donnée :
+
+| Appel Steam | TTL | Pourquoi |
+|---|---|---|
+| `GetSchemaForGame` | 7 jours | Définition des succès d'un jeu : quasi statique |
+| `GetPlayerAchievements` | 5 minutes | Change quand le joueur joue |
+| `GetOwnedGames` | 5 minutes | Même volatilité que ci-dessus (le temps de jeu bouge quand le joueur joue) — même TTL, plutôt qu'une troisième valeur arbitraire |
+
+Une réponse en erreur n'est **jamais** mise en cache (l'écriture n'a lieu
+qu'après une réponse Steam réussie) : un incident passager côté Steam ne
+reste donc pas collé pendant tout le TTL. En revanche une bibliothèque vide
+pour cause de profil privé est mise en cache comme une réponse normale —
+conséquence assumée : repasser son profil en public reste sans effet visible
+jusqu'à expiration du TTL (5 min). Sans `REDIS_URL`, ce cache est une simple `Map` en
 mémoire — fonctionne, mais se vide à chaque redémarrage du service et ne
 serait pas partagé si plusieurs instances tournaient. Avec `REDIS_URL`
 configurée (ex. Render Key Value, Upstash...), le cache passe sur Redis

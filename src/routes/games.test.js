@@ -75,3 +75,39 @@ test('traite un profil privé/bibliothèque masquée (response vide) comme une l
   expect(res.status).toBe(200);
   expect(res.body).toEqual({ games: [] });
 });
+
+test('ne rappelle pas Steam pour un second appel identique (cache)', async () => {
+  mockSteamGamesFetch({
+    response: { game_count: 1, games: [{ appid: 570, name: 'Dota 2', playtime_forever: 60 }] },
+  });
+
+  const first = await request(app).get('/api/steam/games').query({ steamid: '76561197960435533' });
+  const second = await request(app).get('/api/steam/games').query({ steamid: '76561197960435533' });
+
+  expect(first.body).toEqual({ games: [{ appid: 570, name: 'Dota 2', playtimeMinutes: 60 }] });
+  // Même réponse servie depuis le cache, sans second aller-retour Steam.
+  expect(second.body).toEqual(first.body);
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
+test('ne met jamais une erreur Steam en cache : le rappel suivant retente', async () => {
+  // Premier appel en échec, second réussi : sans la garde (écriture du cache
+  // uniquement après une réponse réussie), un incident Steam passager
+  // resterait collé pendant tout le TTL.
+  global.fetch = jest
+    .fn()
+    .mockImplementationOnce(async () => ({ ok: false, status: 500, json: async () => ({}) }))
+    .mockImplementationOnce(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ response: { games: [{ appid: 620, name: 'Portal 2', playtime_forever: 120 }] } }),
+    }));
+
+  const failed = await request(app).get('/api/steam/games').query({ steamid: '76561197960435534' });
+  expect(failed.status).toBe(502);
+
+  const retried = await request(app).get('/api/steam/games').query({ steamid: '76561197960435534' });
+  expect(retried.status).toBe(200);
+  expect(retried.body).toEqual({ games: [{ appid: 620, name: 'Portal 2', playtimeMinutes: 120 }] });
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+});

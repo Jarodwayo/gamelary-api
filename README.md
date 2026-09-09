@@ -36,6 +36,10 @@ après une mise en veille sur l'offre gratuite Render.
 - `steamid` : SteamID64 du joueur (champ "Lier mon compte Steam" du profil
   Gamelary).
 
+Les deux paramètres sont validés avant tout appel sortant (`appid` :
+chiffres ; `steamid` : 17 chiffres) — un format invalide donne un `400`
+sans consommer de quota Steam ni créer d'entrée de cache.
+
 Fusionne `GetSchemaForGame` (définition des succès : nom, description) et
 `GetPlayerAchievements` (état débloqué pour ce joueur) en une seule
 réponse :
@@ -113,6 +117,10 @@ la donnée :
 | `GetSchemaForGame` | 7 jours | Définition des succès d'un jeu : quasi statique |
 | `GetPlayerAchievements` | 5 minutes | Change quand le joueur joue |
 | `GetOwnedGames` | 5 minutes | Même volatilité que ci-dessus (le temps de jeu bouge quand le joueur joue) — même TTL, plutôt qu'une troisième valeur arbitraire |
+
+La distinction entre ces TTL est vérifiée par un test (échanger les deux
+valeurs le fait échouer) : elle ne tenait auparavant qu'à cette ligne de
+README.
 
 Une réponse en erreur n'est **jamais** mise en cache (l'écriture n'a lieu
 qu'après une réponse Steam réussie) : un incident passager côté Steam ne

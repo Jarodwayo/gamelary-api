@@ -147,3 +147,29 @@ diagnostiquer).
   client, restreindre les origines n'ajoute donc pas de sécurité
   supplémentaire ici — à resserrer si le projet grandit au-delà d'une
   démo solo.
+- **Rate limiting** : CORS ouvert + zéro authentification veut dire que
+  n'importe quel site tiers peut faire consommer le quota Steam de cette
+  instance par ses propres visiteurs. Toutes les routes `/api/steam/*`
+  sont donc limitées à 30 requêtes/minute par IP (`express-rate-limit`,
+  monté une seule fois sur le préfixe — le monter sur chaque routeur
+  compterait double, voir `src/app.js`). Par IP plutôt que par clé : il
+  n'y a pas de compte utilisateur ici, seul le quota partagé est protégé,
+  pas un sujet d'authentification. Le ping de santé (`GET /`) n'est pas
+  limité, pour rester toujours joignable et réveiller le service.
+- `GET /api/steam/achievements` valide le format de ses deux paramètres
+  avant tout appel Steam (`appid` : chiffres, `steamid` : 17 chiffres
+  exactement) — un format invalide donne un `400` sans consommer de quota
+  ni créer d'entrée de cache (voir `src/routes/achievements.js`). `GET
+  /api/steam/games` ne vérifie pour l'instant que la présence de
+  `steamid`, pas son format — écart entre les deux routes relevé pendant
+  cette revue, pas encore corrigé.
+
+## Tests
+
+```bash
+npm test   # Jest + Supertest — routes, cache, CORS, rate limiting
+```
+
+Tourne aussi en CI (GitHub Actions, `.github/workflows/ci.yml`) sur chaque
+push et pull request. Les appels Steam sont mockés (`global.fetch`) : aucun
+test ne dépend d'une vraie clé API ni du réseau.

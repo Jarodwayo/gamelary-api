@@ -60,6 +60,9 @@ publics — Steam l'indique sans erreur HTTP, ce endpoint la transforme en
 
 - `steamid` : SteamID64 du joueur (même champ que ci-dessus).
 
+Validé avant tout appel sortant (17 chiffres exactement) — un format
+invalide donne un `400` sans consommer de quota ni créer d'entrée de cache.
+
 Bibliothèque Steam complète du joueur avec son temps de jeu total
 (`IPlayerService/GetOwnedGames`), utilisée côté Gamelary pour compléter les
 heures des jeux suivis et créer ceux que le catalogue ne connaît pas encore :
@@ -156,13 +159,10 @@ diagnostiquer).
   n'y a pas de compte utilisateur ici, seul le quota partagé est protégé,
   pas un sujet d'authentification. Le ping de santé (`GET /`) n'est pas
   limité, pour rester toujours joignable et réveiller le service.
-- `GET /api/steam/achievements` valide le format de ses deux paramètres
-  avant tout appel Steam (`appid` : chiffres, `steamid` : 17 chiffres
-  exactement) — un format invalide donne un `400` sans consommer de quota
-  ni créer d'entrée de cache (voir `src/routes/achievements.js`). `GET
-  /api/steam/games` ne vérifie pour l'instant que la présence de
-  `steamid`, pas son format — écart entre les deux routes relevé pendant
-  cette revue, pas encore corrigé.
+- Les deux routes valident le format de leurs paramètres avant tout appel
+  Steam (`appid` : chiffres ; `steamid` : 17 chiffres exactement) — un
+  format invalide donne un `400` sans consommer de quota ni créer d'entrée
+  de cache (voir `src/routes/achievements.js` et `src/routes/games.js`).
 
 ## Tests
 

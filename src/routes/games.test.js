@@ -112,16 +112,32 @@ test('ne met jamais une erreur Steam en cache : le rappel suivant retente', asyn
   expect(global.fetch).toHaveBeenCalledTimes(2);
 });
 
-test('encode le steamid avant de le placer dans l’URL Steam', async () => {
+test('rejette un steamid mal formé avec 400, sans appeler Steam', async () => {
+  // Même règle que la route équivalente (achievements.js) : un SteamID64
+  // fait 17 chiffres. Une valeur collée dans le champ "Lier mon compte
+  // Steam" n'est validée nulle part côté app (voir game-store.tsx côté
+  // Gamelary) — une frontière système ne fait pas confiance à son appelant.
+  global.fetch = jest.fn();
+
+  const res = await request(app)
+    .get('/api/steam/games')
+    .query({ steamid: '76561197960435540&format=xml' });
+
+  expect(res.status).toBe(400);
+  expect(res.body).toEqual({ error: 'Paramètre "steamid" invalide' });
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test('seuls des chiffres atteignent l’URL Steam depuis que le steamid est validé', async () => {
+  // Verrouille ce qui est RÉELLEMENT garanti depuis que la route valide son
+  // paramètre : un premier jet de ce test vérifiait l'encodage
+  // (`encodeURIComponent`) d'une valeur injectée — devenu creux, la
+  // validation rejetant désormais toute valeur à encoder avant même
+  // d'atteindre l'URL (voir achievements.js pour le même raisonnement).
   mockSteamGamesFetch({ response: { games: [] } });
 
-  // Une valeur collée dans le champ "Lier mon compte Steam" n'est validée
-  // nulle part (voir game-store.tsx côté Gamelary) : sans encodage, un `&`
-  // injecterait un paramètre supplémentaire dans la requête envoyée à Steam.
-  await request(app).get('/api/steam/games').query({ steamid: '76561197960435540&format=xml' });
+  await request(app).get('/api/steam/games').query({ steamid: '76561197960435540' });
 
   const calledUrl = global.fetch.mock.calls[0][0];
-  expect(calledUrl).toContain('steamid=76561197960435540%26format%3Dxml');
-  // Le paramètre injecté ne doit jamais apparaître comme un vrai paramètre.
-  expect(calledUrl).not.toContain('&format=xml');
+  expect(new URL(calledUrl).searchParams.get('steamid')).toBe('76561197960435540');
 });

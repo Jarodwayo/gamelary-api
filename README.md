@@ -60,6 +60,9 @@ publics — Steam l'indique sans erreur HTTP, ce endpoint la transforme en
 
 - `steamid` : SteamID64 du joueur (même champ que ci-dessus).
 
+Validé avant tout appel sortant (17 chiffres exactement) — un format
+invalide donne un `400` sans consommer de quota ni créer d'entrée de cache.
+
 Bibliothèque Steam complète du joueur avec son temps de jeu total
 (`IPlayerService/GetOwnedGames`), utilisée côté Gamelary pour compléter les
 heures des jeux suivis et créer ceux que le catalogue ne connaît pas encore :
@@ -147,3 +150,26 @@ diagnostiquer).
   client, restreindre les origines n'ajoute donc pas de sécurité
   supplémentaire ici — à resserrer si le projet grandit au-delà d'une
   démo solo.
+- **Rate limiting** : CORS ouvert + zéro authentification veut dire que
+  n'importe quel site tiers peut faire consommer le quota Steam de cette
+  instance par ses propres visiteurs. Toutes les routes `/api/steam/*`
+  sont donc limitées à 30 requêtes/minute par IP (`express-rate-limit`,
+  monté une seule fois sur le préfixe — le monter sur chaque routeur
+  compterait double, voir `src/app.js`). Par IP plutôt que par clé : il
+  n'y a pas de compte utilisateur ici, seul le quota partagé est protégé,
+  pas un sujet d'authentification. Le ping de santé (`GET /`) n'est pas
+  limité, pour rester toujours joignable et réveiller le service.
+- Les deux routes valident le format de leurs paramètres avant tout appel
+  Steam (`appid` : chiffres ; `steamid` : 17 chiffres exactement) — un
+  format invalide donne un `400` sans consommer de quota ni créer d'entrée
+  de cache (voir `src/routes/achievements.js` et `src/routes/games.js`).
+
+## Tests
+
+```bash
+npm test   # Jest + Supertest — routes, cache, CORS, rate limiting
+```
+
+Tourne aussi en CI (GitHub Actions, `.github/workflows/ci.yml`) sur chaque
+push et pull request. Les appels Steam sont mockés (`global.fetch`) : aucun
+test ne dépend d'une vraie clé API ni du réseau.

@@ -52,6 +52,15 @@ router.get('/games', async (req, res) => {
     return res.status(400).json({ error: 'Paramètre "steamid" requis' });
   }
 
+  // Même validation que la route équivalente (achievements.js) : un
+  // SteamID64 fait 17 chiffres, déjà vérifié à la saisie côté app mais
+  // revalidé ici — une frontière système ne fait pas confiance à son
+  // appelant. Rejeté avant tout appel Steam, sans consommer de quota ni
+  // créer d'entrée de cache.
+  if (!/^[0-9]{17}$/.test(String(steamid))) {
+    return res.status(400).json({ error: 'Paramètre "steamid" invalide' });
+  }
+
   const apiKey = process.env.STEAM_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ error: 'STEAM_API_KEY non configurée côté serveur' });
